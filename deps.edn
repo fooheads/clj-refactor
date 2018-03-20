@@ -1,0 +1,9 @@
+{:deps {rewrite-clj {:mvn/version "0.6.0"}
+        cljfmt {:mvn/version "0.5.7"}
+        org.clojure/tools.reader {:mvn/version "1.2.1"}}
+ :aliases {:test {:extra-paths ["test"]
+                  :extra-deps {com.cognitect/test-runner {:git/url "git@github.com:cognitect-labs/test-runner"
+                                                          :sha "5fb4fc46ad0bf2e0ce45eba5b9117a2e89166479"}}
+                  :main-opts ["-m" "cognitect.test-runner"]
+                  }} 
+ }

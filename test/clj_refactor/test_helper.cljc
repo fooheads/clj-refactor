@@ -1,7 +1,9 @@
 (ns clj-refactor.test-helper
   (:require
-   [cljs.reader :as r]
-   [rewrite-clj.zip :as z]))
+    #?(:clj [clojure.tools.reader :as r] 
+       :cljs [cljs.tools.reader :as r])
+
+    [rewrite-clj.zip :as z]))
 
 (defn str-zip-to
   [form-str goto f]
@@ -35,13 +37,13 @@
 (defn apply-zip-root
   [form goto f]
   (r/read-string
-   (str "(do "
-        (z/root-string (zip-to form goto f))
-        ")")))
+    (str "(do "
+         (z/root-string (zip-to form goto f))
+         ")")))
 
 (defn apply-zip-str-root
   [form-str goto f]
   (r/read-string
-   (str "(do "
-        (z/root-string (str-zip-to form-str goto f))
-        ")")))
+    (str "(do "
+         (z/root-string (str-zip-to form-str goto f))
+         ")")))

@@ -1,13 +1,13 @@
 (ns ^:figwheel-always clj-refactor.transform-test
-  (:require [cljs.nodejs :as nodejs]
-            [cljs.test :refer-macros [deftest is testing run-tests are]]
+  (:require #?(:clj [clojure.test :refer [deftest is testing run-tests are]]
+               :cljs [cljs.test :refer-macros [deftest is testing run-tests are]])
             [clojure.string :as str]
-            [clj-refactor.main :as m]
             [clj-refactor.transform :as t]
             [clj-refactor.test-helper :refer [apply-zip apply-zip-to apply-zip-root apply-zip-str-root]]))
 
-(deftest testing-main
-  (is (= {:row 1, :col 1, :new-lines ["(a #\"/\")"]} (m/zip-it identity ["(a #\"/\")"] 1 1 []))))
+;; TODO: Remove this?
+;;(deftest testing-main
+;;  (is (= {:row 1, :col 1, :new-lines ["(a #\"/\")"]} (m/zip-it identity ["(a #\"/\")"] 1 1 []))))
 
 (deftest testing-introduce-let
   (are [i j] (= i j)

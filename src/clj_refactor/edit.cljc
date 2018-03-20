@@ -1,24 +1,31 @@
 (ns clj-refactor.edit
   (:require
-   [cljfmt.core :as fmt]
-   [clojure.string :as string]
-   [clojure.zip :as cz]
-   [rewrite-clj.node :as n]
-   [rewrite-clj.node.forms :as nf]
-   [rewrite-clj.node.protocols :as np]
-   [rewrite-clj.paredit :as p]
-   [rewrite-clj.zip :as z]
-   [rewrite-clj.zip.utils :as zu]
-   [rewrite-clj.zip.whitespace :as ws]))
+    [cljfmt.core :as fmt]
+    [clojure.string :as string]
+    [clojure.zip :as cz]
+    [rewrite-clj.node :as n]
+    #?(:clj [rewrite-clj.node.forms]
+       :cljs [rewrite-clj.node.forms :refer FormsNode])
+
+    [rewrite-clj.node.protocols :as np]
+    [rewrite-clj.paredit :as p]
+    [rewrite-clj.zip :as z]
+    [rewrite-clj.zip.utils :as zu]
+    [rewrite-clj.zip.whitespace :as ws])
+  #?(:clj (:import (rewrite_clj.node.forms FormsNode))))
 
 (defn top? [loc]
-  (= nf/FormsNode (type (z/node loc))))
+  (= FormsNode (type (z/node loc))))
 
-(defn zdbg [loc msg]
-  (if (exists? js/debug)
-    (js/debug (pr-str (z/string loc)) msg)
-    (doto (z/string loc) (prn msg)))
-  loc)
+#?(:clj (defn zdbg [loc msg]
+        (prn (z/string loc) msg)
+        loc)
+
+   :cljs (defn zdbg [loc msg]
+           (if (exists? js/debug)
+             (js/debug (pr-str (z/string loc)) msg)
+             (doto (z/string loc) (prn msg)))
+           loc))
 
 (defn exec-while [loc f p?]
   (->> loc

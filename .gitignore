@@ -1,8 +1,1 @@
-/node_modules
-/.nrepl-port
-/.lein-repl-history
-/.lein-failures
-/figwheel_server.log
-/target
-/rplugin/node/clj-refactor.js.map
-/rplugin/node/clj-refactor/
+.cpcache

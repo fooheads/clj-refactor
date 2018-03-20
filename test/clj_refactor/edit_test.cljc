@@ -1,13 +1,13 @@
 (ns ^:figwheel-always clj-refactor.edit-test
   (:require
-   [rewrite-clj.paredit :as p]
-   [rewrite-clj.zip :as z]
-   [rewrite-clj.zip.whitespace :as zw]
-   [cljs.nodejs :as nodejs]
-   [cljs.test :refer-macros [deftest is testing run-tests are]]
-   [clojure.string :as str]
-   [clj-refactor.edit :as e]
-   [clj-refactor.test-helper :refer [str-zip-to zip-to apply-zip apply-zip-str apply-zip-to]]))
+    [rewrite-clj.paredit :as p]
+    [rewrite-clj.zip :as z]
+    [rewrite-clj.zip.whitespace :as zw]
+    #?(:clj [clojure.test :refer [deftest is testing run-tests are]]
+       :cljs [cljs.test :refer-macros [deftest is testing run-tests are]])
+    [clojure.string :as str]
+    [clj-refactor.edit :as e]
+    [clj-refactor.test-helper :refer [str-zip-to zip-to apply-zip apply-zip-str apply-zip-to]]))
 
 (deftest test-remove-right
   (are [i j] (= i j)

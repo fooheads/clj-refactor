@@ -1,20 +1,21 @@
 (ns clj-refactor.transform
   (:require
-   [clj-refactor.edit :as edit]
-   [cljs.nodejs :as nodejs]
-   [cljs.reader :as reader]
-   [clojure.zip :as zz]
-   [clojure.string :as string]
-   [rewrite-clj.node :as n]
-   [rewrite-clj.node.forms :as nf]
-   [rewrite-clj.parser :as parser]
-   [rewrite-clj.paredit :as p]
-   [rewrite-clj.zip :as z]
-   [rewrite-clj.zip.base :as zb]
-   [rewrite-clj.zip.findz :as zf]
-   [rewrite-clj.zip.removez :as zr]
-   [rewrite-clj.zip.utils :as zu]
-   [rewrite-clj.zip.whitespace :as ws]))
+    [clj-refactor.edit :as edit]
+    #?(:clj [clojure.tools.reader :as r] 
+       :cljs [cljs.tools.reader :as r])
+
+    [clojure.zip :as zz]
+    [clojure.string :as string]
+    [rewrite-clj.node :as n]
+    [rewrite-clj.node.forms :as nf]
+    [rewrite-clj.parser :as parser]
+    [rewrite-clj.paredit :as p]
+    [rewrite-clj.zip :as z]
+    [rewrite-clj.zip.base :as zb]
+    [rewrite-clj.zip.findz :as zf]
+    [rewrite-clj.zip.removez :as zr]
+    [rewrite-clj.zip.utils :as zu]
+    [rewrite-clj.zip.whitespace :as ws]))
 
 (defn introduce-let
   "Adds a let around the current form."
@@ -37,28 +38,30 @@
 ;; TODO replace bound forms that are being expanded around
 (defn expand-let
   "Expand the scope of the next let up the tree."
-  [zloc _]
-  ;; TODO check that let is also leftmost?
-  (let [let-loc (z/find-value zloc z/prev 'let)
-        bind-node (z/node (z/next let-loc))]
-    (if (edit/parent-let? let-loc)
-      (edit/join-let let-loc)
-      (-> let-loc
-          (z/up) ; move to form above
-          (z/splice) ; splice in let
-          (z/right)
-          (z/right)
-          (edit/remove-left) ; remove let
-          (edit/remove-left) ; remove binding
-          (z/leftmost) ; go to front of form above
-          (z/up) ; go to form container
-          (p/wrap-around :list) ; wrap with new let list
-          (z/up) ; move to new let list
-          (zz/insert-child (n/newlines 1)) ; insert let and bindings backwards
-          (z/insert-child bind-node)
-          (z/insert-child 'let)
-          (z/leftmost) ; go to let
-          (edit/join-let))))) ; join if let above
+  ([zloc _]
+   (expand-let zloc))
+  ([zloc]
+   ;; TODO check that let is also leftmost?
+   (let [let-loc (z/find-value zloc z/prev 'let)
+         bind-node (z/node (z/next let-loc))]
+     (if (edit/parent-let? let-loc)
+       (edit/join-let let-loc)
+       (-> let-loc
+           (z/up) ; move to form above
+           (z/splice) ; splice in let
+           (z/right)
+           (z/right)
+           (edit/remove-left) ; remove let
+           (edit/remove-left) ; remove binding
+           (z/leftmost) ; go to front of form above
+           (z/up) ; go to form container
+           (p/wrap-around :list) ; wrap with new let list
+           (z/up) ; move to new let list
+           (zz/insert-child (n/newlines 1)) ; insert let and bindings backwards
+           (z/insert-child bind-node)
+           (z/insert-child 'let)
+           (z/leftmost) ; go to let
+           (edit/join-let)))))) ; join if let above
 
 (defn move-to-let
   "Adds form and symbol to a let further up the tree"
@@ -107,31 +110,35 @@
 
 (defn cycle-coll
   "Cycles collection between vector, list, map and set"
-  [zloc _]
-  (let [sexpr (z/sexpr zloc)]
-    (if (coll? sexpr)
-      (let [node (z/node zloc)
-            coerce-to-next (fn [sexpr children]
-                             (cond
-                               (map? sexpr) (n/vector-node children)
-                               (vector? sexpr) (n/set-node children)
-                               (set? sexpr) (n/list-node children)
-                               (list? sexpr) (n/map-node children)))]
-        (-> zloc
-            (z/insert-right (coerce-to-next sexpr (n/children node)))
-            (z/remove)))
-      zloc)))
+  ([zloc _] 
+   (cycle-coll zloc))
+  ([zloc]
+   (let [sexpr (z/sexpr zloc)]
+     (if (coll? sexpr)
+       (let [node (z/node zloc)
+             coerce-to-next (fn [sexpr children]
+                              (cond
+                                (map? sexpr) (n/vector-node children)
+                                (vector? sexpr) (n/set-node children)
+                                (set? sexpr) (n/list-node children)
+                                (list? sexpr) (n/map-node children)))]
+         (-> zloc
+             (z/insert-right (coerce-to-next sexpr (n/children node)))
+             (z/remove)))
+       zloc))))
 
 (defn cycle-if
   "Cycles between if and if-not form"
-  [zloc _]
-  (if-let [if-loc (z/find-value zloc z/prev #{'if 'if-not})] ; find first ancestor if
-    (-> if-loc
-        (z/insert-left (if (= 'if (z/sexpr if-loc)) 'if-not 'if)) ; add inverse if / if-not
-        (z/remove) ; remove original if/if-not
-        (z/rightmost) ; Go to last child (else form)
-        (edit/transpose-with-left)) ; Swap children
-    zloc))
+  ([zloc _]
+   (cycle-if zloc))
+  ([zloc]
+   (if-let [if-loc (z/find-value zloc z/prev #{'if 'if-not})] ; find first ancestor if
+     (-> if-loc
+         (z/insert-left (if (= 'if (z/sexpr if-loc)) 'if-not 'if)) ; add inverse if / if-not
+         (z/remove) ; remove original if/if-not
+         (z/rightmost) ; Go to last child (else form)
+         (edit/transpose-with-left)) ; Swap children
+     zloc)))
 
 (defn thread-sym
   [zloc sym]
@@ -153,12 +160,16 @@
       zloc)))
 
 (defn thread
-  [zloc _]
-  (thread-sym zloc '->))
+  ([zloc _] 
+   (thread zloc))
+  ([zloc] 
+   (thread-sym zloc '->)))
 
 (defn thread-last
-  [zloc _]
-  (thread-sym zloc '->>))
+  ([zloc _]
+   (thread-last zloc))
+  ([zloc]
+   (thread-sym zloc '->>)))
 
 (defn thread-all
   [zloc sym]
@@ -168,12 +179,16 @@
       loc)))
 
 (defn thread-first-all
-  [zloc _]
-  (thread-all zloc '->))
+  ([zloc _] 
+   (thread-first-all zloc))
+  ([zloc] 
+   (thread-all zloc '->)))
 
 (defn thread-last-all
-  [zloc _]
-  (thread-all zloc '->>))
+  ([zloc _] 
+   (thread-last-all zloc))
+  ([zloc] 
+   (thread-all zloc '->>)))
 
 (defn ensure-list
   [zloc]
@@ -182,37 +197,41 @@
     (p/wrap-around zloc :list)))
 
 (defn unwind-thread
-  [zloc _]
-  (let [oploc (edit/find-op zloc)
-        thread-type (z/sexpr oploc)]
-    (if (contains? #{'-> '->>} thread-type)
-      (let [first-loc (z/right oploc)
-            first-node (z/node first-loc)
-            move-to-insert-pos (if (= '-> thread-type)
-                                 z/leftmost
-                                 z/rightmost)]
-        (-> first-loc
-            (z/right) ; move to form to unwind into
-            (edit/remove-left) ; remove threaded form
-            (ensure-list) ; make sure we're dealing with a wrapped fn
-            (move-to-insert-pos) ; move to pos based on thread type
-            (z/insert-right first-node)
-            (z/up)
-            ((fn [loc]
-               (if (z/rightmost? loc)
-                 (p/raise loc)
-                 loc)))
-            (z/up)))
-      zloc)))
+  ([zloc _]
+   (unwind-thread zloc))
+  ([zloc]
+   (let [oploc (edit/find-op zloc)
+         thread-type (z/sexpr oploc)]
+     (if (contains? #{'-> '->>} thread-type)
+       (let [first-loc (z/right oploc)
+             first-node (z/node first-loc)
+             move-to-insert-pos (if (= '-> thread-type)
+                                  z/leftmost
+                                  z/rightmost)]
+         (-> first-loc
+             (z/right) ; move to form to unwind into
+             (edit/remove-left) ; remove threaded form
+             (ensure-list) ; make sure we're dealing with a wrapped fn
+             (move-to-insert-pos) ; move to pos based on thread type
+             (z/insert-right first-node)
+             (z/up)
+             ((fn [loc]
+                (if (z/rightmost? loc)
+                  (p/raise loc)
+                  loc)))
+             (z/up)))
+       zloc))))
 
 (defn unwind-all
-  [zloc _]
-  (loop [loc (unwind-thread zloc nil)]
-    (let [oploc (edit/find-op loc)
-          thread-type (z/sexpr oploc)]
-      (if (contains? #{'-> '->>} thread-type)
-        (recur (unwind-thread loc nil))
-        loc))))
+  ([zloc _]
+   (unwind-all zloc))
+  ([zloc]
+   (loop [loc (unwind-thread zloc nil)]
+     (let [oploc (edit/find-op loc)
+           thread-type (z/sexpr oploc)]
+       (if (contains? #{'-> '->>} thread-type)
+         (recur (unwind-thread loc nil))
+         loc)))))
 
 ;; TODO will insert duplicates
 ;; TODO handle :type and :macro
@@ -260,27 +279,33 @@
     zloc))
 
 (defn cycle-thread
-  [zloc _]
-  (cycle-op zloc '-> '->>))
+  ([zloc _]
+   (cycle-thread zloc))
+  ([zloc]
+   (cycle-op zloc '-> '->>)))
 
 (defn cycle-privacy
-  [zloc _]
-  (cycle-op zloc 'defn 'defn-))
+  ([zloc _]
+   (cycle-privacy zloc))
+  ([zloc]
+   (cycle-op zloc 'defn 'defn-)))
 
 (defn function-from-example
-  [zloc _]
-  (let [op-loc (edit/find-op zloc)
-        example-loc (z/up (edit/find-op zloc))
-        child-sexprs (n/child-sexprs (z/node example-loc))
-        fn-name (first child-sexprs)
-        args (for [[i arg] (map-indexed vector (rest child-sexprs))]
-               (if (symbol? arg)
-                 arg
-                 (symbol (str "arg" (inc i)))))]
-    (-> example-loc
-        (edit/to-top)
-        (zz/insert-left (n/coerce `(~'defn ~fn-name [~@args]))) ; add declare
-        (zz/insert-left (n/newlines 2))))) ; add new line after location
+  ([zloc _]
+   (function-from-example zloc))
+  ([zloc]
+   (let [op-loc (edit/find-op zloc)
+         example-loc (z/up (edit/find-op zloc))
+         child-sexprs (n/child-sexprs (z/node example-loc))
+         fn-name (first child-sexprs)
+         args (for [[i arg] (map-indexed vector (rest child-sexprs))]
+                (if (symbol? arg)
+                  arg
+                  (symbol (str "arg" (inc i)))))]
+     (-> example-loc
+         (edit/to-top)
+         (zz/insert-left (n/coerce `(~'defn ~fn-name [~@args]))) ; add declare
+         (zz/insert-left (n/newlines 2)))))) ; add new line after location
 
 (defn extract-function
   [zloc [fn-name used-locals]]
